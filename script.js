@@ -8,6 +8,7 @@ let maze; // Store maze data for collision detection
 
 // Constantes pour la visualisation
 const WALL_HEIGHT = 0.5;
+const WALL_THICKNESS = 0.3; // Augmenté par rapport à la valeur d'origine 0.1
 const WALL_COLOR = 0x607D8B;
 const FLOOR_COLOR = 0xCFD8DC;
 const PLAYER_COLOR = 0xFF5722;
@@ -90,7 +91,7 @@ function generateMaze3D(size, complexity) {
 
 // Fonction séparée pour créer uniquement les murs visuels
 function createWalls(maze, size) {
-    const wallGeometry = new THREE.BoxGeometry(1, WALL_HEIGHT, 0.1);
+    const wallGeometry = new THREE.BoxGeometry(1, WALL_HEIGHT, WALL_THICKNESS);
     const wallMaterial = new THREE.MeshStandardMaterial({
         color: WALL_COLOR,
         metalness: 0.3,
@@ -102,7 +103,7 @@ function createWalls(maze, size) {
         // Mur du haut (bordure supérieure)
         const topWall = new THREE.Mesh(wallGeometry, wallMaterial);
         topWall.position.set(x + 0.5, WALL_HEIGHT / 2, 0);
-        topWall.scale.set(1, 1, 0.1);
+        topWall.scale.set(1, 1, 1); // Suppression du scale 0.1 pour garder l'épaisseur WALL_THICKNESS
         scene.add(topWall);
     }
 
@@ -111,7 +112,7 @@ function createWalls(maze, size) {
         const leftWall = new THREE.Mesh(wallGeometry, wallMaterial);
         leftWall.position.set(0, WALL_HEIGHT / 2, y + 0.5);
         leftWall.rotation.y = Math.PI / 2;
-        leftWall.scale.set(1, 1, 0.1);
+        leftWall.scale.set(1, 1, 1); // Suppression du scale 0.1
         scene.add(leftWall);
     }
 
@@ -123,7 +124,7 @@ function createWalls(maze, size) {
                 const rightWall = new THREE.Mesh(wallGeometry, wallMaterial);
                 rightWall.position.set(x + 1, WALL_HEIGHT / 2, y + 0.5);
                 rightWall.rotation.y = Math.PI / 2;
-                rightWall.scale.set(1, 1, 0.1);
+                rightWall.scale.set(1, 1, 1); // Suppression du scale 0.1
                 scene.add(rightWall);
             }
             
@@ -131,7 +132,7 @@ function createWalls(maze, size) {
             if (maze[y][x].walls.bottom && y < size - 1) {
                 const bottomWall = new THREE.Mesh(wallGeometry, wallMaterial);
                 bottomWall.position.set(x + 0.5, WALL_HEIGHT / 2, y + 1);
-                bottomWall.scale.set(1, 1, 0.1);
+                bottomWall.scale.set(1, 1, 1); // Suppression du scale 0.1
                 scene.add(bottomWall);
             }
         }
@@ -143,7 +144,7 @@ function createWalls(maze, size) {
         const rightBorderWall = new THREE.Mesh(wallGeometry, wallMaterial);
         rightBorderWall.position.set(size, WALL_HEIGHT / 2, y + 0.5);
         rightBorderWall.rotation.y = Math.PI / 2;
-        rightBorderWall.scale.set(1, 1, 0.1);
+        rightBorderWall.scale.set(1, 1, 1); // Suppression du scale 0.1
         scene.add(rightBorderWall);
     }
     
@@ -151,7 +152,7 @@ function createWalls(maze, size) {
         // Mur du bas (bordure inférieure)
         const bottomBorderWall = new THREE.Mesh(wallGeometry, wallMaterial);
         bottomBorderWall.position.set(x + 0.5, WALL_HEIGHT / 2, size);
-        bottomBorderWall.scale.set(1, 1, 0.1);
+        bottomBorderWall.scale.set(1, 1, 1); // Suppression du scale 0.1
         scene.add(bottomBorderWall);
     }
 }
