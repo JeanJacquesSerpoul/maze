@@ -6,9 +6,15 @@ let currentPosition = { x: 0, z: 0 };
 let rendererContainer = null;
 let maze; // Store maze data for collision detection
 
+// Variables pour la simulation de la balle
+let velocity = new THREE.Vector3(0, 0, 0); // Vitesse initiale de la balle
+const GRAVITY = 9.8; // Constante de gravité (ajustable pour le jeu)
+const TIME_STEP = 1 / 60; // Pas de temps basé sur 60 FPS
+const FRICTION = 0.95; // Coefficient de friction pour ralentir la balle
+
 // Constantes pour la visualisation
 const WALL_HEIGHT = 0.5;
-const WALL_THICKNESS = 0.3; // Augmenté par rapport à la valeur d'origine 0.1
+const WALL_THICKNESS = 0.1; // Augmenté par rapport à la valeur d'origine 0.1
 const WALL_COLOR = 0x607D8B;
 const FLOOR_COLOR = 0xCFD8DC;
 const PLAYER_COLOR = 0xFF5722;
@@ -88,7 +94,14 @@ function generateMaze3D(size, complexity) {
     exit.position.set(size - 0.5, 0.05, size - 0.5);
     scene.add(exit);
 }
-
+// Fonction pour obtenir l'inclinaison de la caméra (vecteur direction horizontal)
+function getInclination() {
+    const center = new THREE.Vector3(mazeSize / 2, 0, mazeSize / 2);
+    const cameraDirection = camera.position.clone().sub(center).normalize();
+    cameraDirection.y = 0; // Projection sur le plan XZ (horizontal)
+    cameraDirection.normalize();
+    return cameraDirection;
+}
 // Fonction séparée pour créer uniquement les murs visuels
 function createWalls(maze, size) {
     const wallGeometry = new THREE.BoxGeometry(1, WALL_HEIGHT, WALL_THICKNESS);
@@ -340,27 +353,6 @@ function setupCamera() {
     controls.update();
 }
 
-function move(dx, dz) {
-    const newX = currentPosition.x + dx;
-    const newZ = currentPosition.z + dz;
-
-    // Vérifier si le mouvement est valide (pas de mur)
-    if (canMove(currentPosition.x, currentPosition.z, newX, newZ)) {
-        currentPosition.x = newX;
-        currentPosition.z = newZ;
-
-        // Animation fluide
-        new TWEEN.Tween(player.position)
-            .to({ x: newX + 0.5, z: newZ + 0.5 }, 200)
-            .easing(TWEEN.Easing.Quadratic.Out)
-            .start();
-
-        // Vérification victoire
-        if (newX === mazeSize - 1 && newZ === mazeSize - 1) {
-            setTimeout(() => alert('Bravo ! Vous avez trouvé la sortie !'), 300);
-        }
-    }
-}
 
 function canMove(x, z, newX, newZ) {
     // Vérifier si on reste dans les limites du labyrinthe
@@ -381,23 +373,109 @@ function canMove(x, z, newX, newZ) {
 
     return true;
 }
+// Fonction pour vérifier si la balle peut se déplacer vers la nouvelle position
+function canMoveTo(newPosition) {
+    const radius = 0.3; // Rayon de la balle
+    const wallThickness = WALL_THICKNESS / 2; // Moitié de l’épaisseur des murs
+    const mazeSize = 10; // Taille du labyrinthe (exemple)
+    const minX = radius; // Bord gauche du labyrinthe
+    const maxX = mazeSize - radius; // Bord droit du labyrinthe
+    const minZ = radius; // Bord haut du labyrinthe
+    const maxZ = mazeSize - radius; // Bord bas du labyrinthe
+
+    // Vérification des limites extérieures
+    if (newPosition.x < minX || newPosition.x > maxX || newPosition.z < minZ || newPosition.z > maxZ) {
+        return false;
+    }
+
+    // Coordonnées des cellules actuelles et nouvelles
+    const currentX = Math.floor(player.position.x);
+    const currentZ = Math.floor(player.position.z);
+    const newX = Math.floor(newPosition.x);
+    const newZ = Math.floor(newPosition.z);
+
+    // Pas de collision si le déplacement reste dans la même cellule
+    if (currentX === newX && currentZ === newZ) {
+        return true;
+    }
+
+    // Vérification des collisions selon la direction
+    if (newX > currentX) { // Déplacement vers la droite
+        if (maze[currentZ][currentX].walls.right) {
+            const wallPosition = currentX + 1 - wallThickness; // Position du mur à droite
+            if (newPosition.x + radius > wallPosition) {
+                return false; // Collision avec le mur droit
+            }
+        }
+    } else if (newX < currentX) { // Déplacement vers la gauche
+        if (maze[currentZ][newX].walls.right) {
+            const wallPosition = newX + wallThickness; // Position du mur à gauche
+            if (newPosition.x - radius < wallPosition) {
+                return false; // Collision avec le mur gauche
+            }
+        }
+    }
+
+    if (newZ > currentZ) { // Déplacement vers le bas
+        if (maze[currentZ][currentX].walls.bottom) {
+            const wallPosition = currentZ + 1 - wallThickness; // Position du mur en bas
+            if (newPosition.z + radius > wallPosition) {
+                return false; // Collision avec le mur inférieur
+            }
+        }
+    } else if (newZ < currentZ) { // Déplacement vers le haut
+        if (maze[newZ][currentX].walls.bottom) {
+            const wallPosition = newZ + wallThickness; // Position du mur en haut
+            if (newPosition.z - radius < wallPosition) {
+                return false; // Collision avec le mur supérieur
+            }
+        }
+    }
+
+    return true; // Aucun obstacle détecté
+}
 
 function animate() {
     requestAnimationFrame(animate);
     TWEEN.update();
     controls.update();
+
+    // Calculer l'inclinaison basée sur la caméra
+    const inclination = getInclination();
+
+    // Calculer l'accélération due à la gravité en fonction de l'inclinaison
+    const acceleration = new THREE.Vector3(
+        inclination.x * GRAVITY,
+        0,
+        inclination.z * GRAVITY
+    );
+
+    // Mettre à jour la vitesse
+    velocity.add(acceleration.clone().multiplyScalar(TIME_STEP));
+
+    // Appliquer la friction pour ralentir la balle
+    velocity.multiplyScalar(FRICTION);
+
+    // Calculer la nouvelle position
+    const newPosition = player.position.clone().add(velocity.clone().multiplyScalar(TIME_STEP));
+
+    // Vérifier les collisions et ajuster la position
+    if (canMoveTo(newPosition)) {
+        player.position.copy(newPosition);
+    } else {
+        // Si collision, arrêter la vitesse dans la direction du déplacement
+        velocity.set(0, 0, 0);
+    }
+
+    // Vérifier si la balle atteint la sortie
+    if (Math.abs(player.position.x - (mazeSize - 0.5)) < 0.3 && Math.abs(player.position.z - (mazeSize - 0.5)) < 0.3) {
+        setTimeout(() => alert('Bravo ! Vous avez trouvé la sortie !'), 100);
+    }
+
     renderer.render(scene, camera);
 }
 
-// Gestion des touches
-document.addEventListener('keydown', (e) => {
-    switch (e.key) {
-        case 'ArrowUp': move(0, -1); break;
-        case 'ArrowDown': move(0, 1); break;
-        case 'ArrowLeft': move(-1, 0); break;
-        case 'ArrowRight': move(1, 0); break;
-    }
-});
+
 
 // Adaptation redimensionnement fenêtre
 window.addEventListener('resize', () => {
